@@ -190,7 +190,8 @@ def spow(base, exponent):
       return pow(base, exponent)
 
 def float3pow(base, exponent):
-      return np.array([pow(base[0], exponent), pow(base[1], exponent), pow(base[2], exponent)])
+      #return np.array([pow(base[0], exponent), pow(base[1], exponent), pow(base[2], exponent)])
+      return np.power(base, exponent)
 
 # "safe" div
 def sdiv( a, b ):
@@ -200,7 +201,7 @@ def sdiv( a, b ):
       return a / b
 
 def post_adaptation_non_linear_response_compression_forward(RGB, F_L):
-  F_L_RGB = float3pow(F_L * np.abs(RGB) / 100.0, 0.42)
+  F_L_RGB = np.power((F_L / 100.0) * np.abs(RGB), 0.42)
   RGB_c = (400.0 * np.sign(RGB) * F_L_RGB) / (27.13 + F_L_RGB)
   return RGB_c
 
@@ -222,13 +223,13 @@ def JMh_to_limit_RGB(JMh):
 
 # basic 3D hypotenuse function, does not deal with under/overflow
 def hypot_float3(xyz):
-    return np.sqrt(xyz[0]*xyz[0] + xyz[1]*xyz[1] + xyz[2]*xyz[2])
+    return np.sqrt(xyz.dot(xyz)) #np.sqrt(xyz[0]*xyz[0] + xyz[1]*xyz[1] + xyz[2]*xyz[2])
 
 def compress_bjorn(xyz):
     C = (xyz[0]+xyz[1]+xyz[2])/3
 
     xyz_temp = xyz - C
-    R = hypot_float3(xyz_temp)
+    R = np.sqrt(xyz_temp.dot(xyz_temp)) # hypot_float3(xyz_temp)
 
     if (R == 0.0 or C == 0.0):
       return xyz
@@ -255,7 +256,7 @@ def uncompress_bjorn(xyz):
     C = (xyz[0]+xyz[1]+xyz[2])/3
 
     xyz_temp = xyz - C
-    R = hypot_float3(xyz_temp)
+    R = np.sqrt(xyz_temp.dot(xyz_temp)) # hypot_float3(xyz_temp)
 
     if (R == 0.0 or C == 0.0):
       return xyz
@@ -282,11 +283,11 @@ def uncompress_bjorn(xyz):
 
 # convert radians to degrees
 def degrees( radians ):
-    return radians * 180.0 / np.pi
+    return np.rad2deg(radians) # radians * 180.0 / np.pi
 
 # convert degrees to radians
 def radians( degrees ):
-    return degrees / 180.0 * np.pi
+    return np.deg2rad(degrees) # degrees / 180.0 * np.pi
 
 def XYZ_to_Hellwig2022_JMh(XYZ, XYZ_w, L_A, Y_b, surround):
   XYZ_w = XYZ_w * XYZ_w_scaler
@@ -375,7 +376,8 @@ def JMh_to_reach_RGB(JMh):
    return RGB
 
 def post_adaptation_non_linear_response_compression_inverse(RGB, F_L):
-  RGB_p =  (np.sign(RGB) * 100.0 / F_L * float3pow((27.13 * np.abs(RGB)) / (400.0 - np.abs(RGB)), 1.0 / 0.42) )
+  absRGB = np.abs(RGB)
+  RGB_p  = (100.0 / F_L) * np.sign(RGB) * np.power((27.13 * absRGB) / (400.0 - absRGB), 1.0 / 0.42)
   return RGB_p
 
 def Hellwig2022_JMh_to_XYZ( JMh, XYZ_w, surround, L_A, Y_b):
@@ -444,8 +446,8 @@ def Hellwig2022_JMh_to_XYZ( JMh, XYZ_w, surround, L_A, Y_b):
   # Step 6
   RGB = RGB_c / D_RGB
 
-  # Step 7
-  MATRIX_INVERSE_16 = np.linalg.inv(CAT_CAT16)
+  # Step 7 CAT_CAT16_INVERSE
+  MATRIX_INVERSE_16 = CAT_CAT16_INVERSE
   XYZ = vector_dot(MATRIX_INVERSE_16, RGB)
 
   return XYZ
@@ -509,18 +511,12 @@ def smin(a, b, s):
 # reimplemented from https:#github.com/nick-shaw/aces-ot-vwg-experiments/blob/master/python/intersection_approx.py
 def solve_J_intersect(JM, focusJ, maxJ, slope_gain):
   a = JM[1] / (focusJ * slope_gain)
-  b = 0.0
-  c = 0.0
-  intersectJ = 0.0
 
   if (JM[0] < focusJ):
     b = 1.0 - JM[1] / slope_gain
-  else:
-    b = -(1.0 + JM[1] / slope_gain + maxJ * JM[1] / (focusJ * slope_gain))
-
-  if (JM[0] < focusJ):
     c = -JM[0]
   else:
+    b = -(1.0 + JM[1] / slope_gain + maxJ * JM[1] / (focusJ * slope_gain))
     c = maxJ * JM[1] / slope_gain + JM[0]
 
   root = np.sqrt(b*b - 4.0 * a * c)
@@ -564,7 +560,7 @@ def findGamutBoundaryIntersection(JMh_s, JM_cusp, J_focus, J_max, slope_gain, sm
 def init():
   global peakLuminance, primariesLimit, whiteLimit, inWhite, outWhite, boundaryRGB, RGB_to_XYZ_limit, refWhite
   global gamutCuspTable, gamutCuspTableReach, cgamutCuspTable, cgamutReachTable, gamutTopGamma
-  global XYZ_to_RGB_limit, XYZ_to_RGB_input, RGB_to_XYZ_input, XYZ_to_RGB_output, RGB_to_XYZ_output, XYZ_to_RGB_reach, RGB_to_XYZ_reach, XYZ_to_AP1, AP1_to_XYZ, CAT_CAT16, panlrcm
+  global XYZ_to_RGB_limit, XYZ_to_RGB_input, RGB_to_XYZ_input, XYZ_to_RGB_output, RGB_to_XYZ_output, XYZ_to_RGB_reach, RGB_to_XYZ_reach, XYZ_to_AP1, AP1_to_XYZ, CAT_CAT16, CAT_CAT16_INVERSE, panlrcm
   global daniele_m_2, daniele_s_2, daniele_g, daniele_t_1, daniele_n, daniele_u_2, daniele_n_r
   global compr, sat, sat_thr, limitJmax, midJ, focusDist, cuspMidBlend, model_gamma, lowerHullGamma, smoothCusps, clamp_thr, clamp_dist
 
@@ -739,6 +735,7 @@ def init():
   AP1_to_XYZ = np.linalg.inv(XYZ_to_AP1)
 
   CAT_CAT16 = RGBPrimsToXYZMatrix(rxy, gxy, bxy, wxy, 1.0, 1)
+  CAT_CAT16_INVERSE = np.linalg.inv(CAT_CAT16)
 
   white = np.array([1.0, 1.0, 1.0])
 
@@ -826,7 +823,7 @@ def init():
         low = high
         high = high + search_range
 
-    while (high - low) > 1e-3: # how close should we be
+    while (high - low) > 1e-6: # how close should we be
       sampleM = (high + low) / 2
       newLimitRGB = JMh_to_reach_RGB(np.array([limitJmax, sampleM, hue]))
       if outside_reach(newLimitRGB):
@@ -887,7 +884,7 @@ def init():
         low = high
         high = high + search_range
 
-    while (high - low) > 1e-3: # how close should we be
+    while (high - low) > 1e-6: # how close should we be
       sampleM = (high + low) / 2
       newLimitRGB = JMh_to_reach_RGB(np.array([limitJmax, sampleM, hue]))
       if outside_reach(newLimitRGB):
