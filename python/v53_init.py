@@ -479,6 +479,9 @@ def cusp_interval_for_hue(hue):
     low_i, high_i = 0, gamutCuspTableSize - 1
     # as the distribution is approximately linear we locate the interval faster by probing at that point first
     i = int(hue) % gamutCuspTableSize
+    if i < 0:
+      i = i + gamutCuspTableSize
+
     while (low_i + 1 < high_i):
       if (hue > gamutCuspTable[i][2]):
         low_i = i
@@ -919,7 +922,7 @@ def init():
     search_range = 0.4
     low, high = 0, search_range
     outside = False
-    while not outside and high < 5.0:
+    while not outside and high < 10.0:
       gammaFound = evaluate_gamma_fit(JMcusp, hue, testJmh, high, maxRGBtestVal)
       if not gammaFound:
         low = high
